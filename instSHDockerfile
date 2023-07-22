@@ -1,0 +1,43 @@
+# Stage 1: Build Vue project
+FROM node:lts-alpine as build-stage
+
+# Install Scribe CLI - valint
+RUN apk update && apk add curl && apk add tar
+RUN curl -sSfL https://get.scribesecurity.com/install.sh  | sh -s -- -t valint
+
+# Scribe Hub params
+ARG SCRIBE_CLIENT_ID
+ARG SCRIBE_CLIENT_SECRET
+
+# Install Vue CLI 
+RUN npm install -g @vue/cli
+
+# Set working directory
+WORKDIR /app
+
+# Create new Vue project
+RUN vue create -d my-app 
+
+# Navigate into the project directory
+WORKDIR /app/my-app
+
+# Build the Vue app in production mode
+RUN npm run build
+
+# Use valint to create an SBOM of the project with dependencies
+RUN /root/.scribe/bin/valint bom dir:. --output-file my-app-sbom.json -E -U ${SCRIBE_CLIENT_ID} -P ${SCRIBE_CLIENT_SECRET}
+
+# Stage 2: Setup Nginx
+FROM nginx:stable-alpine as production-stage
+
+# Copy built app to Nginx serve directory
+COPY --from=build-stage /app/my-app/dist /usr/share/nginx/html
+
+# Copy SBOM to final image
+COPY --from=build-stage /app/my-app/my-app-sbom.json /usr/share/nginx/html/sbom.json
+
+# Expose port 80
+EXPOSE 80
+
+# Start Nginx
+CMD ["nginx", "-g", "daemon off;"]
