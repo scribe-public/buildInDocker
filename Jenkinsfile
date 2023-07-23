@@ -7,21 +7,12 @@ pipeline {
                 script {
                     // Define Docker Image name
                     def dockerImage = docker.build('npm-sample', '-f instDockerfile .')
-                }
-            }
-        }
-        stage('Extract File') {
-            steps {
-                script {
-                    // Run the container
                     def container = docker.run(dockerImage.id)
-                    // Copy the file from the container to the Jenkins workspace
-                    sh "docker cp ${container.id}:/usr/share/nginx/html/sbom.json ."
-                    // Remove the container
-                    container.stop()
+                    sh "docker cp ${container}:/usr/share/nginx/html/sbom.json ."
                 }
             }
         }
+        
 
         stage('Archive File') {
             steps {
